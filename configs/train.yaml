@@ -1,0 +1,27 @@
+defaults:
+  - _self_
+  - dataset: tiny_imagenet
+  - model: vit_lite
+  - system: local_mac # Default to local dev
+
+dataloader:
+  batch_size: 256
+  # System params will be merged here or used separately in train.py
+
+paths:
+  # project_root is the directory where the command was run (usually the repo root)
+  project_root: ${hydra:runtime.cwd}
+  data_dir: ${paths.project_root}/data
+  output_dir: ${paths.project_root}/outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+hydra:
+  run:
+    dir: ${paths.output_dir}
+  sweep:
+    dir: ${paths.project_root}/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
+  job:
+    chdir: True # Hydra will create the dir and move there
+
+seed: 42
+device: ??? # Will be set to mps, cuda, or cpu in train.py

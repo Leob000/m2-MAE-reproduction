@@ -1,0 +1,5 @@
+# Optimized for Apple Silicon M4 (10 cores)
+num_workers: 8 # Leave some cores for the OS
+pin_memory: true
+persistent_workers: true
+prefetch_factor: 2

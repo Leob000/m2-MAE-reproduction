@@ -34,16 +34,39 @@ build-backend = "hatchling.build"
 # UP: PyUpgrade (rewrites old python syntax to new, e.g., List[int] -> list[int])
 # B: Flake8-Bugbear (catches common bugs and design problems)
 # A: Flake8-Builtins (prevents you from shadowing python builtins like 'id' or 'dir')
-select = ["E", "F", "I", "N", "D", "UP", "B", "A"]
+# C4: Flake8-comprehensions (Optimizes list/dict comprehensions - faster DL data loading)
+# SIM: Flake8-simplify
+# ARG: Flake8-unused-arguments
+# PT: Flake8-pytest-style
+# RET: Flake8-return
+select = [
+  "E",
+  "F",
+  "I",
+  "N",
+  "D",
+  "UP",
+  "B",
+  "A",
+  "C4",
+  "SIM",
+  "ARG",
+  "PT",
+  "RET",
+]
 
 # Ignore specific rules that conflict with common Math/AI practices
 ignore = [
-  "D100", # Missing docstring in public module (top of file)
-  "D104", # Missing docstring in public package (__init__.py)
-  "D107", # Missing docstring in __init__ (We document args in class docstring instead)
-  "E501", # Line too long (Let the formatter handle code, ignore docs length)
-  "N806", # Variable in function should be lowercase (Annoying for Math: allows 'X', 'W', 'b')
-  "N803", # Argument name should be lowercase (Allows 'X' as input argument)
+  "D100",   # Missing docstring in public module (top of file)
+  "D104",   # Missing docstring in public package (__init__.py)
+  "D107",   # Missing docstring in __init__ (We document args in class docstring instead)
+  "E501",   # Line too long (Let the formatter handle code, ignore docs length)
+  "N806",   # Variable in function should be lowercase (Annoying for Math: allows 'X', 'W', 'b')
+  "N803",   # Argument name should be lowercase (Allows 'X' as input argument)
+  "D105",   # Missing docstring in magic method
+  "ARG002",
+  "RET504",
+  "PT018",
 ]
 
 [tool.ruff.lint.pydocstyle]

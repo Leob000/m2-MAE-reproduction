@@ -1,0 +1,5 @@
+# Optimized for Cluster Nodes (A100/A40)
+num_workers: 16 # Adjust based on CPU cores per GPU
+pin_memory: true
+persistent_workers: true
+prefetch_factor: 4
