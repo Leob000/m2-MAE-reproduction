@@ -20,3 +20,31 @@ dev = ["pre-commit>=4.5.1", "pytest>=9.0.2", "ruff>=0.14.14", "ty>=0.0.14"]
 [tool.pytest.ini_options]
 pythonpath = "src"
 testpaths = ["tests"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff.lint]
+# The 'select' list defines the rules to enable.
+# E/F: Default syntax/style
+# I: Isort (sorts imports automatically - huge for ML repos with many imports)
+# N: PEP8 Naming (enforces class/function naming conventions)
+# D: Pydocstyle (enforces the docstring format we discussed)
+# UP: PyUpgrade (rewrites old python syntax to new, e.g., List[int] -> list[int])
+# B: Flake8-Bugbear (catches common bugs and design problems)
+# A: Flake8-Builtins (prevents you from shadowing python builtins like 'id' or 'dir')
+select = ["E", "F", "I", "N", "D", "UP", "B", "A"]
+
+# Ignore specific rules that conflict with common Math/AI practices
+ignore = [
+  "D100", # Missing docstring in public module (top of file)
+  "D104", # Missing docstring in public package (__init__.py)
+  "D107", # Missing docstring in __init__ (We document args in class docstring instead)
+  "E501", # Line too long (Let the formatter handle code, ignore docs length)
+  "N806", # Variable in function should be lowercase (Annoying for Math: allows 'X', 'W', 'b')
+  "N803", # Argument name should be lowercase (Allows 'X' as input argument)
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"

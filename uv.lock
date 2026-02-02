@@ -316,7 +316,7 @@ wheels = [
 [[package]]
 name = "m2-ovo-mae"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "einops" },
     { name = "hydra-core" },
