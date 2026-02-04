@@ -6,7 +6,19 @@ defaults:
 
 dataloader:
   batch_size: 256
+  drop_last: true
   # System params will be merged here or used separately in train.py
+
+optimizer:
+  base_lr: 5e-4
+  weight_decay: 0.15
+  betas: [0.9, 0.95]
+
+train:
+  mask_ratio: 0.75
+  warmup_epochs: 40
+  epochs: 400
+  save_interval: 50
 
 paths:
   # project_root is the directory where the command was run (usually the repo root)
