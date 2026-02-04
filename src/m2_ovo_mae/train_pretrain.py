@@ -28,7 +28,6 @@ def get_device():
 
 def adjust_learning_rate(optimizer, epoch, i, steps_per_epoch, cfg):
     """Decays the learning rate with half-cycle cosine after warmup."""
-    # Base LR (e.g., 5e-4) * (Effective Batch Size / 256)
     eff_batch_size = cfg.dataloader.batch_size
     base_lr = cfg.optimizer.base_lr * eff_batch_size / 256
 
@@ -58,15 +57,63 @@ def adjust_learning_rate(optimizer, epoch, i, steps_per_epoch, cfg):
     return lr
 
 
+@torch.no_grad()
+def log_reconstructions(model, dataloader, device, num_samples=4):
+    """Logs original, masked, and reconstructed images to WandB."""
+    model.eval()
+    imgs, _ = next(iter(dataloader))
+    imgs = imgs[:num_samples].to(device)
+
+    _, pred, mask = model(imgs)
+
+    # Unpatchify predictions
+    pred_imgs = model.unpatchify(pred)
+
+    # Visualize the mask by expanding it to patch pixels
+    p = model.patch_embed.patch_size[0]
+    mask_expanded = (
+        mask.unsqueeze(-1)
+        .repeat(1, 1, p**2 * 3)
+        .reshape(imgs.shape[0], imgs.shape[2] // p, imgs.shape[3] // p, p, p, 3)
+    )
+    mask_expanded = torch.einsum("nhwpqc->nchpwq", mask_expanded).reshape(imgs.shape)
+
+    # Masked image: 0 where mask=1 (removed)
+    masked_imgs = imgs * (1 - mask_expanded)
+
+    # Combined image (reconstruction on masked patches, original on visible)
+    combined_imgs = imgs * (1 - mask_expanded) + pred_imgs * mask_expanded
+
+    # Prepare for WandB
+    log_dict = {}
+    for i in range(num_samples):
+        # Denormalize for logging assuming standard ImageNet statistics
+        mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1).to(device)
+        std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1).to(device)
+
+        orig = (imgs[i] * std + mean).clamp(0, 1).cpu()
+        masked = (masked_imgs[i] * std + mean).clamp(0, 1).cpu()
+        recon = (pred_imgs[i] * std + mean).clamp(0, 1).cpu()
+        comb = (combined_imgs[i] * std + mean).clamp(0, 1).cpu()
+
+        log_dict[f"viz/sample_{i}"] = [
+            wandb.Image(orig, caption="Original"),
+            wandb.Image(masked, caption="Masked"),
+            wandb.Image(recon, caption="Reconstruction"),
+            wandb.Image(comb, caption="Combined"),
+        ]
+
+    wandb.log(log_dict, commit=False)
+    model.train()
+
+
 @hydra.main(version_base=None, config_path="../../configs", config_name="train")
 def main(cfg: DictConfig):
     """Main training entry point for MAE pre-training."""
-    # Setup
     torch.manual_seed(cfg.seed)
     device = get_device()
     logger.info(f"Using device: {device}")
 
-    # WandB initialization
     if wandb.run is None:
         wandb_config = cast(dict[str, Any], OmegaConf.to_container(cfg, resolve=True))
 
@@ -77,12 +124,10 @@ def main(cfg: DictConfig):
             name=f"pretrain-{time.strftime('%Y%m%d-%H%M%S')}",
         )
 
-    # Model
     model = hydra.utils.instantiate(cfg.model)
     model.to(device)
     logger.info(f"Model instantiated: {cfg.model._target_}")
 
-    # Dataset & Dataloader
     transform = get_pretrain_transforms(
         img_size=cfg.dataset.img_size,
         use_rrc=cfg.dataset.augmentation.use_rrc,
@@ -107,25 +152,25 @@ def main(cfg: DictConfig):
         drop_last=cfg.dataloader.drop_last,
     )
 
-    # Optimizer
     optimizer = torch.optim.AdamW(
         model.parameters(),
-        lr=0,  # Will be set by adjust_learning_rate
+        lr=0,
         betas=tuple(cfg.optimizer.betas),
         weight_decay=cfg.optimizer.weight_decay,
     )
 
-    # Training Loop
     model.train()
     steps_per_epoch = len(dataloader)
     total_epochs = cfg.train.epochs
 
     for epoch in range(total_epochs):
+        epoch_loss = 0.0
+        num_steps = 0
+
         for i, (imgs, _) in enumerate(dataloader):
             if cfg.train.max_steps is not None and i >= cfg.train.max_steps:
                 break
 
-            # Adjust learning rate per step
             lr = adjust_learning_rate(optimizer, epoch, i, steps_per_epoch, cfg)
 
             imgs = imgs.to(device)
@@ -133,21 +178,37 @@ def main(cfg: DictConfig):
             optimizer.zero_grad()
             loss, _, _ = model(imgs, mask_ratio=cfg.train.mask_ratio)
             loss.backward()
+            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), float("inf"))
             optimizer.step()
+
+            batch_loss = loss.item()
+            epoch_loss += batch_loss
+            num_steps += 1
 
             if i % cfg.train.log_interval == 0:
                 logger.info(
-                    f"Epoch {epoch}/{total_epochs} | Step {i}/{steps_per_epoch} | Loss: {loss.item():.4f} | LR: {lr:.2e}"
+                    f"Epoch {epoch}/{total_epochs} | Step {i}/{steps_per_epoch} | Loss: {batch_loss:.4f} | LR: {lr:.2e} | GradNorm: {grad_norm:.2f}"
                 )
-                wandb.log(
-                    {
-                        "train/loss": loss.item(),
-                        "train/lr": lr,
-                        "train/epoch": epoch + i / steps_per_epoch,
-                    }
-                )
+                if wandb.run is not None:
+                    wandb.log(
+                        {
+                            "train/loss": batch_loss,
+                            "train/lr": lr,
+                            "train/grad_norm": grad_norm,
+                            "train/epoch": epoch + i / steps_per_epoch,
+                        }
+                    )
 
-        # Save checkpoint periodically
+        # Log average epoch loss
+        avg_loss = epoch_loss / num_steps
+        logger.info(f"Epoch {epoch} complete | Avg Loss: {avg_loss:.4f}")
+        if wandb.run is not None:
+            wandb.log({"epoch/avg_loss": avg_loss, "epoch/num": epoch})
+
+            # Log reconstructions periodically
+            if (epoch + 1) % 50 == 0 or epoch == 0:
+                log_reconstructions(model, dataloader, device)
+
         checkpoint_data = {
             "epoch": epoch,
             "model_state_dict": model.state_dict(),
@@ -155,11 +216,9 @@ def main(cfg: DictConfig):
             "cfg": cfg,
         }
 
-        # Save "last" checkpoint every epoch
         last_ckpt_path = os.path.join(cfg.paths.output_dir, "checkpoint-last.pth")
         torch.save(checkpoint_data, last_ckpt_path)
 
-        # Save historical checkpoints at intervals or on the final epoch
         if (epoch + 1) % cfg.train.save_interval == 0 or (epoch + 1) == total_epochs:
             ckpt_path = os.path.join(cfg.paths.output_dir, f"checkpoint-{epoch}.pth")
             torch.save(checkpoint_data, ckpt_path)
