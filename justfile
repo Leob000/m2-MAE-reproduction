@@ -1,4 +1,11 @@
 set shell := ["bash", "-c"]
+set dotenv-load
+
+# --- Cluster Configuration ---
+# Use a .env file (git-ignored) to set these variables locally
+cluster_host := env_var_or_default("CLUSTER_HOST", "user@host")
+cluster_path := env_var_or_default("CLUSTER_PATH", "~/projects/m2-ovo-mae")
+cluster_partition := env_var_or_default("CLUSTER_PARTITION", "gpu")
 
 # Run all checks (format, lint, type-check) on the codebase
 check path=".":
@@ -33,3 +40,27 @@ fast-train:
 # Run a single, fast evaluation epoch to verify pipeline functionality
 fast-eval:
     uv run python src/m2_ovo_mae/train_classifier.py experiment=fast_eval
+
+# --- Remote Cluster Management ---
+
+# Sync local code to cluster (respects .gitignore)
+sync:
+    @echo "Syncing code to {{cluster_host}}..."
+    rsync -avz --filter=':- .gitignore' --exclude '.git' --exclude 'wandb' --exclude 'outputs' ./ {{cluster_host}}:{{cluster_path}}
+
+# Check SLURM queue on the cluster
+sq *args="":
+    ssh {{cluster_host}} "squeue -p {{cluster_partition}} {{args}}"
+
+# Cancel SLURM jobs on the cluster
+sc *args="":
+    ssh {{cluster_host}} "scancel {{args}}"
+
+# Remote execution: Always syncs code first, then runs a 'just' command on the cluster
+# Usage: just remote <command>
+remote *args: sync
+    ssh {{cluster_host}} "cd {{cluster_path}} && just {{args}}"
+
+# Tail the latest SLURM log on the cluster
+logs:
+    ssh {{cluster_host}} "ls -t {{cluster_path}}/slurm_logs/*.out | head -n 1 | xargs tail -f"
