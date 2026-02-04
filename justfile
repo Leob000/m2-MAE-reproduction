@@ -34,12 +34,19 @@ test:
     uv run pytest
 
 # Run a single, fast training epoch to verify pipeline functionality
-fast-train:
-    uv run python src/m2_ovo_mae/train_pretrain.py experiment=fast_run
+fast-train *args="":
+    uv run python src/m2_ovo_mae/train_pretrain.py experiment=fast_run {{args}}
 
 # Run a single, fast evaluation epoch to verify pipeline functionality
-fast-eval:
-    uv run python src/m2_ovo_mae/train_classifier.py experiment=fast_eval
+fast-eval *args="":
+    uv run python src/m2_ovo_mae/train_classifier.py experiment=fast_eval {{args}}
+
+# --- SLURM (Runs on the machine where it is called) ---
+
+# Submit a training job to SLURM
+slurm *args:
+    mkdir -p slurm_logs
+    uv run python scripts/slurm/submit.py {{args}} wandb.mode=online system=cluster_slurm
 
 # --- Remote Cluster Management ---
 
@@ -59,7 +66,12 @@ sc *args="":
 # Remote execution: Always syncs code first, then runs a 'just' command on the cluster
 # Usage: just remote <command>
 remote *args: sync
-    ssh {{cluster_host}} "cd {{cluster_path}} && just {{args}}"
+    ssh {{cluster_host}} "cd {{cluster_path}} && CLUSTER_PARTITION={{cluster_partition}} just {{args}}"
+
+# Remote execution via srun: Syncs code, then runs a 'just' command on a compute node
+# Usage: just remote-srun <command>
+remote-srun *args: sync
+    ssh {{cluster_host}} "cd {{cluster_path}} && srun -p {{cluster_partition}} --gpus=1 just {{args}}"
 
 # Tail the latest SLURM log on the cluster
 logs:
