@@ -3,6 +3,7 @@ defaults:
   - dataset: tiny_imagenet
   - model: vit_lite
   - system: local_mac # Default to local dev
+  - experiment: null # Optional experiment overrides
 
 dataloader:
   batch_size: 256
@@ -19,6 +20,8 @@ train:
   warmup_epochs: 40
   epochs: 400
   save_interval: 50
+  log_interval: 10
+  max_steps: null # If set, limits the number of steps per epoch (useful for debugging)
 
 paths:
   # project_root is the directory where the command was run (usually the repo root)
@@ -37,3 +40,7 @@ hydra:
 
 seed: 42
 device: ??? # Will be set to mps, cuda, or cpu in train.py
+
+wandb:
+  project: m2-ovo-mae
+  mode: online # Use 'offline' or 'disabled' to skip cloud syncing

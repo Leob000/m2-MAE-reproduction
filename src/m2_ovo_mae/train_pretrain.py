@@ -71,7 +71,8 @@ def main(cfg: DictConfig):
         wandb_config = cast(dict[str, Any], OmegaConf.to_container(cfg, resolve=True))
 
         wandb.init(
-            project="m2-ovo-mae",
+            project=cfg.wandb.project,
+            mode=cfg.wandb.mode,
             config=wandb_config,
             name=f"pretrain-{time.strftime('%Y%m%d-%H%M%S')}",
         )
@@ -118,6 +119,9 @@ def main(cfg: DictConfig):
 
     for epoch in range(total_epochs):
         for i, (imgs, _) in enumerate(dataloader):
+            if cfg.train.max_steps is not None and i >= cfg.train.max_steps:
+                break
+
             # Adjust learning rate per step
             lr = adjust_learning_rate(optimizer, epoch, i, steps_per_epoch, cfg)
 
@@ -128,9 +132,9 @@ def main(cfg: DictConfig):
             loss.backward()
             optimizer.step()
 
-            if i % 10 == 0:
+            if i % cfg.train.log_interval == 0:
                 logger.info(
-                    f"Epoch {epoch}/{total_epochs} | Step {i}/{steps_per_epoch} | Loss: {loss.item():.4f} | LR: {lr:.6f}"
+                    f"Epoch {epoch}/{total_epochs} | Step {i}/{steps_per_epoch} | Loss: {loss.item():.4f} | LR: {lr:.2e}"
                 )
                 wandb.log(
                     {

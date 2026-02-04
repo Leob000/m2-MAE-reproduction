@@ -25,3 +25,7 @@ type-check path=".":
 # Run tests
 test:
     uv run pytest
+
+# Run a single, fast training epoch to verify pipeline functionality
+fast-train:
+    uv run python src/m2_ovo_mae/train_pretrain.py experiment=fast_run
