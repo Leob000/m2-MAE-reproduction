@@ -51,6 +51,9 @@ def get_pretrain_transforms(
 def get_classification_transforms(
     img_size=64,
     is_train=True,
+    use_randaug=False,
+    randaug_n=2,
+    randaug_m=9,
     crop_min_scale=0.08,
     interpolation=3,
     mean=IMAGENET_MEAN,
@@ -61,6 +64,9 @@ def get_classification_transforms(
     Args:
         img_size (int): Target image size.
         is_train (bool): Whether to return training or validation transforms.
+        use_randaug (bool): Whether to use RandAugment.
+        randaug_n (int): RandAugment n parameter.
+        randaug_m (int): RandAugment m parameter.
         crop_min_scale (float): Minimum scale for RandomResizedCrop (train only).
         interpolation (int/str): Interpolation mode.
         mean (tuple): Normalization mean.
@@ -71,18 +77,27 @@ def get_classification_transforms(
     """
     interp = _get_interpolation(interpolation)
     if is_train:
-        return transforms.Compose(
+        t = [
+            transforms.RandomResizedCrop(
+                img_size,
+                scale=(crop_min_scale, 1.0),
+                interpolation=interp,
+            ),
+            transforms.RandomHorizontalFlip(),
+        ]
+        if use_randaug:
+            t.append(
+                transforms.RandAugment(
+                    num_ops=randaug_n, magnitude=randaug_m, interpolation=interp
+                )
+            )
+        t.extend(
             [
-                transforms.RandomResizedCrop(
-                    img_size,
-                    scale=(crop_min_scale, 1.0),
-                    interpolation=interp,
-                ),
-                transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 transforms.Normalize(mean=mean, std=std),
             ]
         )
+        return transforms.Compose(t)
     # Standard validation transforms: resize then center crop
     return transforms.Compose(
         [

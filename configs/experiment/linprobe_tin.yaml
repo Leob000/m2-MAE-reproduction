@@ -1,0 +1,27 @@
+# @package _global_
+
+# Linear Probing configuration for Tiny ImageNet following Charisoudis et al. (2022)
+# Protocol: 50 epochs, 1e-3 base LR, 2 warmup epochs, AdamW.
+defaults:
+  - override /dataset: tiny_imagenet_clf
+
+dataloader:
+  batch_size: 128
+  num_workers: 8
+  persistent_workers: true
+
+optimizer:
+  base_lr: 1e-3
+  weight_decay: 0.0
+
+train:
+  epochs: 50
+  warmup_epochs: 2
+  log_interval: 50
+  max_steps: null
+
+wandb:
+  mode: online
+
+# Path to the pre-trained MAE checkpoint
+pretrained_checkpoint: ???

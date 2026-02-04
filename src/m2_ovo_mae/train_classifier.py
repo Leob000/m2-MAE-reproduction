@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 from m2_ovo_mae.dataset.tiny_imagenet import TinyImageNet
 from m2_ovo_mae.dataset.transforms import get_classification_transforms
 from m2_ovo_mae.models.classifier import ViTClassifier
+from m2_ovo_mae.train_pretrain import adjust_learning_rate
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,9 @@ def main(cfg: DictConfig):
     train_transform = get_classification_transforms(
         img_size=cfg.dataset.img_size,
         is_train=True,
+        use_randaug=cfg.dataset.augmentation.use_randaug,
+        randaug_n=cfg.dataset.augmentation.randaug_n,
+        randaug_m=cfg.dataset.augmentation.randaug_m,
         crop_min_scale=cfg.dataset.augmentation.crop_min_scale,
         interpolation=cfg.dataset.augmentation.interpolation,
     )
@@ -142,13 +146,14 @@ def main(cfg: DictConfig):
     # We will use AdamW here
     optimizer = torch.optim.AdamW(
         model.head.parameters(),  # Only optimize the head for linear probing
-        lr=cfg.optimizer.base_lr * cfg.dataloader.batch_size / 256,
-        weight_decay=0.0,  # Linear probing often uses 0 weight decay
+        lr=0,  # Will be set by adjust_learning_rate
+        weight_decay=cfg.optimizer.weight_decay,
     )
     criterion = nn.CrossEntropyLoss()
 
     # Training Loop
     total_epochs = cfg.train.epochs
+    steps_per_epoch = len(train_loader)
     best_acc = 0.0
 
     for epoch in range(total_epochs):
@@ -160,6 +165,9 @@ def main(cfg: DictConfig):
             if cfg.train.max_steps is not None and i >= cfg.train.max_steps:
                 break
 
+            # Adjust learning rate per step
+            lr = adjust_learning_rate(optimizer, epoch, i, steps_per_epoch, cfg)
+
             imgs, labels = imgs.to(device), labels.to(device)
 
             logits = model(imgs)
@@ -170,11 +178,14 @@ def main(cfg: DictConfig):
             optimizer.step()
 
             if i % cfg.train.log_interval == 0:
-                logger.info(f"Epoch {epoch} | Step {i} | Loss: {loss.item():.4f}")
+                logger.info(
+                    f"Epoch {epoch} | Step {i} | Loss: {loss.item():.4f} | LR: {lr:.2e}"
+                )
                 wandb.log(
                     {
                         "train/loss": loss.item(),
-                        "train/epoch": epoch + i / len(train_loader),
+                        "train/lr": lr,
+                        "train/epoch": epoch + i / steps_per_epoch,
                     }
                 )
 

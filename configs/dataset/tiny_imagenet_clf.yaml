@@ -4,3 +4,6 @@ num_classes: 200
 augmentation:
   crop_min_scale: 0.08
   interpolation: bicubic
+  use_randaug: false
+  randaug_n: 2
+  randaug_m: 9
