@@ -85,6 +85,7 @@ def main(cfg: DictConfig):
     # Dataset & Dataloader
     transform = get_pretrain_transforms(
         img_size=cfg.dataset.img_size,
+        use_rrc=cfg.dataset.augmentation.use_rrc,
         crop_min_scale=cfg.dataset.augmentation.crop_min_scale,
         interpolation=cfg.dataset.augmentation.interpolation,
     )

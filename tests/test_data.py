@@ -75,3 +75,20 @@ def test_transforms_shapes():
 
     assert isinstance(out, torch.Tensor)
     assert out.shape == (3, 64, 64)
+
+
+def test_pretrain_augmentation_logic():
+    """Test that pre-training transforms handle RRC toggle correctly."""
+    from PIL import Image
+
+    img = Image.new("RGB", (100, 100), color="red")
+
+    # With RRC (default)
+    transform_rrc = get_pretrain_transforms(img_size=64, use_rrc=True)
+    out_rrc = transform_rrc(img)
+    assert out_rrc.shape == (3, 64, 64)
+
+    # Without RRC (None/Center Crop style)
+    transform_no_rrc = get_pretrain_transforms(img_size=64, use_rrc=False)
+    out_no_rrc = transform_no_rrc(img)
+    assert out_no_rrc.shape == (3, 64, 64)

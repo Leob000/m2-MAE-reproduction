@@ -5,6 +5,7 @@ split: train
 img_size: 64
 
 augmentation:
+  use_rrc: false
   crop_min_scale: 0.2
   interpolation: 3 # Bicubic
   mean: [0.485, 0.456, 0.406]

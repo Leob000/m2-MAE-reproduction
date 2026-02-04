@@ -17,6 +17,7 @@ def _get_interpolation(interpolation):
 
 def get_pretrain_transforms(
     img_size=64,
+    use_rrc=True,
     crop_min_scale=0.2,
     interpolation=3,
     mean=IMAGENET_MEAN,
@@ -26,6 +27,7 @@ def get_pretrain_transforms(
 
     Args:
         img_size (int): Target image size.
+        use_rrc (bool): Whether to use RandomResizedCrop.
         crop_min_scale (float): Minimum scale for RandomResizedCrop.
         interpolation (int): Interpolation mode (3=BICUBIC).
         mean (tuple): Normalization mean.
@@ -34,18 +36,29 @@ def get_pretrain_transforms(
     Returns:
         transforms.Compose: Composition of transforms.
     """
-    return transforms.Compose(
-        [
+    interp = _get_interpolation(interpolation)
+    if use_rrc:
+        t = [
             transforms.RandomResizedCrop(
                 img_size,
                 scale=(crop_min_scale, 1.0),
-                interpolation=interpolation,
+                interpolation=interp,
             ),
+        ]
+    else:
+        t = [
+            transforms.Resize(img_size, interpolation=interp),
+            transforms.CenterCrop(img_size),
+        ]
+
+    t.extend(
+        [
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize(mean=mean, std=std),
         ]
     )
+    return transforms.Compose(t)
 
 
 def get_classification_transforms(
