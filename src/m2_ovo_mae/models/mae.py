@@ -351,6 +351,36 @@ class MaskedAutoencoderViT(nn.Module):
         loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
         return loss
 
+    def forward_features(self, x):
+        """Standard ViT forward pass without masking.
+
+        Used for linear probing and fine-tuning.
+
+        Args:
+            x (torch.Tensor): Input images of shape (N, 3, H, W).
+
+        Returns:
+            torch.Tensor: The encoded CLS token (N, D).
+        """
+        # embed patches
+        x = self.patch_embed(x)
+
+        # add pos embed w/o cls token
+        x = x + self.pos_embed[:, 1:, :]
+
+        # append cls token
+        cls_token = self.cls_token + self.pos_embed[:, :1, :]
+        cls_tokens = cls_token.expand(x.shape[0], -1, -1)
+        x = torch.cat((cls_tokens, x), dim=1)
+
+        # apply Transformer blocks
+        for blk in self.blocks:
+            x = blk(x)
+        x = self.norm(x)
+
+        # return CLS token
+        return x[:, 0]
+
     def forward(self, imgs, mask_ratio=0.75):
         """Forward pass of the MAE.
 

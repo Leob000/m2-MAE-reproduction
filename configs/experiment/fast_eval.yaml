@@ -1,0 +1,25 @@
+# @package _global_
+
+# Minimal configuration for classification smoke tests
+defaults:
+  - override /dataset: tiny_imagenet_clf
+
+dataloader:
+  batch_size: 4
+  num_workers: 0
+  persistent_workers: false
+
+train:
+  epochs: 1
+  max_steps: 5
+  log_interval: 1
+
+wandb:
+  mode: offline
+
+paths:
+  output_dir: outputs/fast_eval
+
+# For testing purposes, we don't strictly need a real checkpoint
+# if we just want to see if the script runs.
+pretrained_checkpoint: null

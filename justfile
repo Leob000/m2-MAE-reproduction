@@ -29,3 +29,7 @@ test:
 # Run a single, fast training epoch to verify pipeline functionality
 fast-train:
     uv run python src/m2_ovo_mae/train_pretrain.py experiment=fast_run
+
+# Run a single, fast evaluation epoch to verify pipeline functionality
+fast-eval:
+    uv run python src/m2_ovo_mae/train_classifier.py experiment=fast_eval

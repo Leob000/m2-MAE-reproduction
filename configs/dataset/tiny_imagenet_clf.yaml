@@ -1,0 +1,6 @@
+root: ${paths.data_dir}
+img_size: 64
+num_classes: 200
+augmentation:
+  crop_min_scale: 0.08
+  interpolation: bicubic

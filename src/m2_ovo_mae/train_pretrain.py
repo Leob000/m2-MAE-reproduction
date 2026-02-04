@@ -98,9 +98,11 @@ def main(cfg: DictConfig):
         dataset,
         batch_size=cfg.dataloader.batch_size,
         shuffle=True,
-        num_workers=cfg.system.num_workers,
-        pin_memory=cfg.system.pin_memory,
-        persistent_workers=cfg.system.persistent_workers,
+        num_workers=cfg.dataloader.get("num_workers", cfg.system.num_workers),
+        pin_memory=cfg.dataloader.get("pin_memory", cfg.system.pin_memory),
+        persistent_workers=cfg.dataloader.get(
+            "persistent_workers", cfg.system.persistent_workers
+        ),
         drop_last=cfg.dataloader.drop_last,
     )
 
