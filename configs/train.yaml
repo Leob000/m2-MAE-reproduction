@@ -18,8 +18,8 @@ optimizer:
 train:
   mask_ratio: 0.75
   warmup_epochs: 20
-  epochs: 800
-  save_interval: 50
+  epochs: 1200
+  save_interval: 100
   log_interval: 10
   max_steps: null # If set, limits the number of steps per epoch (useful for debugging)
 

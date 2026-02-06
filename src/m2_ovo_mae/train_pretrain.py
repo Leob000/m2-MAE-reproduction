@@ -58,13 +58,32 @@ def adjust_learning_rate(optimizer, epoch, i, steps_per_epoch, cfg):
 
 
 @torch.no_grad()
-def log_reconstructions(model, dataloader, device, num_samples=4):
-    """Logs original, masked, and reconstructed images to WandB."""
+def log_reconstructions(model, dataloader, device, num_samples=4, seed=42):
+    """Logs fixed original, masked, and reconstructed images to WandB."""
     model.eval()
+    # Get a fixed batch
     imgs, _ = next(iter(dataloader))
     imgs = imgs[:num_samples].to(device)
 
+    # Use a fixed seed for the masking to ensure consistency across calls
+    rng_state = torch.get_rng_state()
+    if device.type == "cuda":
+        cuda_rng_state = torch.cuda.get_rng_state(device)
+    elif device.type == "mps":
+        # MPS doesn't have a specific get_rng_state, it uses the global torch seed
+        pass
+
+    torch.manual_seed(seed)
+    if device.type == "cuda":
+        torch.cuda.manual_seed(seed)
+
+    # Forward pass with fixed masking
     _, pred, mask = model(imgs)
+
+    # Restore RNG state
+    torch.set_rng_state(rng_state)
+    if device.type == "cuda":
+        torch.cuda.set_rng_state(cuda_rng_state, device)
 
     if model.norm_pix_loss:
         target = model.patchify(imgs)
@@ -158,6 +177,15 @@ def main(cfg: DictConfig):
         drop_last=cfg.dataloader.drop_last,
     )
 
+    # Fixed dataloader for visualization (using val split and small batch)
+    viz_dataset = TinyImageNet(
+        root=cfg.dataset.root,
+        split="val",
+        download=True,
+        transform=transform,
+    )
+    viz_dataloader = DataLoader(viz_dataset, batch_size=4, shuffle=False)
+
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=0,
@@ -213,7 +241,7 @@ def main(cfg: DictConfig):
 
             # Log reconstructions periodically
             if (epoch + 1) % 50 == 0 or epoch == 0:
-                log_reconstructions(model, dataloader, device)
+                log_reconstructions(model, viz_dataloader, device)
 
         checkpoint_data = {
             "epoch": epoch,
