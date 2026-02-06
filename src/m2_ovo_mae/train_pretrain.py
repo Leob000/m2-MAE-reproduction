@@ -66,6 +66,12 @@ def log_reconstructions(model, dataloader, device, num_samples=4):
 
     _, pred, mask = model(imgs)
 
+    if model.norm_pix_loss:
+        target = model.patchify(imgs)
+        mean = target.mean(dim=-1, keepdim=True)
+        var = target.var(dim=-1, keepdim=True)
+        pred = pred * (var + 1.0e-6) ** 0.5 + mean
+
     # Unpatchify predictions
     pred_imgs = model.unpatchify(pred)
 

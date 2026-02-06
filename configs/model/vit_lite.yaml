@@ -16,4 +16,4 @@ decoder_depth: 2
 decoder_num_heads: 4
 
 # MAE Specifics
-norm_pix_loss: false
+norm_pix_loss: true
