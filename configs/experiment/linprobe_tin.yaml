@@ -7,7 +7,9 @@ defaults:
 
 dataset:
   augmentation:
-    use_randaug: true
+    use_randaug: false
+    use_rrc: false
+    use_flip: true
 
 dataloader:
   batch_size: 128
@@ -17,6 +19,7 @@ dataloader:
 optimizer:
   base_lr: 1e-3
   weight_decay: 0.0
+  betas: [0.9, 0.95]
 
 train:
   epochs: 50

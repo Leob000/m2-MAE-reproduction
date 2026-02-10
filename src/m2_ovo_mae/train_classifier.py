@@ -125,6 +125,8 @@ def main(cfg: DictConfig):
         img_size=cfg.dataset.img_size,
         is_train=True,
         use_randaug=cfg.dataset.augmentation.use_randaug,
+        use_rrc=cfg.dataset.augmentation.get("use_rrc", True),
+        use_flip=cfg.dataset.augmentation.get("use_flip", True),
         randaug_n=cfg.dataset.augmentation.randaug_n,
         randaug_m=cfg.dataset.augmentation.randaug_m,
         crop_min_scale=cfg.dataset.augmentation.crop_min_scale,
@@ -178,6 +180,7 @@ def main(cfg: DictConfig):
     optimizer = torch.optim.AdamW(
         params,
         lr=0,  # Will be set by adjust_learning_rate
+        betas=tuple(cfg.optimizer.betas),
         weight_decay=cfg.optimizer.weight_decay,
     )
     criterion = nn.CrossEntropyLoss()

@@ -65,6 +65,8 @@ def get_classification_transforms(
     img_size=64,
     is_train=True,
     use_randaug=False,
+    use_rrc=True,
+    use_flip=True,
     randaug_n=2,
     randaug_m=9,
     crop_min_scale=0.08,
@@ -78,6 +80,8 @@ def get_classification_transforms(
         img_size (int): Target image size.
         is_train (bool): Whether to return training or validation transforms.
         use_randaug (bool): Whether to use RandAugment.
+        use_rrc (bool): Whether to use RandomResizedCrop.
+        use_flip (bool): Whether to use RandomHorizontalFlip.
         randaug_n (int): RandAugment n parameter.
         randaug_m (int): RandAugment m parameter.
         crop_min_scale (float): Minimum scale for RandomResizedCrop (train only).
@@ -90,14 +94,26 @@ def get_classification_transforms(
     """
     interp = _get_interpolation(interpolation)
     if is_train:
-        t = [
-            transforms.RandomResizedCrop(
-                img_size,
-                scale=(crop_min_scale, 1.0),
-                interpolation=interp,
-            ),
-            transforms.RandomHorizontalFlip(),
-        ]
+        t = []
+        if use_rrc:
+            t.append(
+                transforms.RandomResizedCrop(
+                    img_size,
+                    scale=(crop_min_scale, 1.0),
+                    interpolation=interp,
+                )
+            )
+        else:
+            t.extend(
+                [
+                    transforms.Resize(img_size, interpolation=interp),
+                    transforms.CenterCrop(img_size),
+                ]
+            )
+
+        if use_flip:
+            t.append(transforms.RandomHorizontalFlip())
+
         if use_randaug:
             t.append(
                 transforms.RandAugment(
