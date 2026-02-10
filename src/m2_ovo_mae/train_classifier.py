@@ -1,6 +1,5 @@
 import logging
 import os
-import time
 from typing import Any, cast
 
 import hydra
@@ -66,11 +65,19 @@ def main(cfg: DictConfig):
     if wandb.run is None:
         wandb_config = cast(dict[str, Any], OmegaConf.to_container(cfg, resolve=True))
         mode_name = "finetune" if cfg.train.get("finetune", False) else "linprobe"
+
+        # Try to extract epoch from checkpoint name for better naming
+        ckpt_name = "scratch"
+        if hasattr(cfg, "pretrained_checkpoint") and cfg.pretrained_checkpoint:
+            ckpt_base = os.path.basename(cfg.pretrained_checkpoint)
+            # checkpoint-1099.pth -> 1099
+            ckpt_name = ckpt_base.replace("checkpoint-", "").replace(".pth", "")
+
         wandb.init(
             project=cfg.wandb.project,
             mode=cfg.wandb.mode,
             config=wandb_config,
-            name=f"{mode_name}-{time.strftime('%Y%m%d-%H%M%S')}",
+            name=f"{mode_name}-{ckpt_name}",
         )
 
     # Ensure output directory exists
@@ -83,7 +90,9 @@ def main(cfg: DictConfig):
     # Load pre-trained weights if provided
     if hasattr(cfg, "pretrained_checkpoint") and cfg.pretrained_checkpoint:
         logger.info(f"Loading pre-trained weights from {cfg.pretrained_checkpoint}")
-        checkpoint = torch.load(cfg.pretrained_checkpoint, map_location="cpu")
+        checkpoint = torch.load(
+            cfg.pretrained_checkpoint, map_location="cpu", weights_only=False
+        )
         # Load state dict with strict=False to ignore decoder weights
         msg = mae_model.load_state_dict(checkpoint["model_state_dict"], strict=False)
         logger.info(
