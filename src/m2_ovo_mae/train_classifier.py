@@ -30,7 +30,8 @@ def get_device():
 def evaluate(model, dataloader, device, max_steps=None):
     """Evaluates the model on the validation set."""
     model.eval()
-    correct = 0
+    correct_1 = 0
+    correct_5 = 0
     total = 0
     loss_total = 0
     criterion = nn.CrossEntropyLoss()
@@ -43,14 +44,24 @@ def evaluate(model, dataloader, device, max_steps=None):
         loss = criterion(logits, labels)
 
         loss_total += loss.item()
+
+        # Top-1 accuracy
         _, predicted = logits.max(1)
         total += labels.size(0)
-        correct += predicted.eq(labels).sum().item()
+        correct_1 += predicted.eq(labels).sum().item()
+
+        # Top-5 accuracy
+        _, top5 = logits.topk(5, 1, True, True)
+        correct_5 += top5.eq(labels.view(-1, 1).expand_as(top5)).sum().item()
 
     num_batches = (
         len(dataloader) if max_steps is None else min(len(dataloader), max_steps)
     )
-    return loss_total / num_batches, 100.0 * correct / total
+    return (
+        loss_total / num_batches,
+        100.0 * correct_1 / total,
+        100.0 * correct_5 / total,
+    )
 
 
 @hydra.main(version_base=None, config_path="../../configs", config_name="train")
@@ -182,6 +193,10 @@ def main(cfg: DictConfig):
             # Freeze encoder explicitly for linear probing
             model.encoder.eval()
 
+        train_correct_1 = 0
+        train_correct_5 = 0
+        train_total = 0
+
         for i, (imgs, labels) in enumerate(train_loader):
             if cfg.train.max_steps is not None and i >= cfg.train.max_steps:
                 break
@@ -198,39 +213,62 @@ def main(cfg: DictConfig):
             loss.backward()
             optimizer.step()
 
+            # Calculate training accuracy
+            with torch.no_grad():
+                _, predicted = logits.max(1)
+                train_total += labels.size(0)
+                train_correct_1 += predicted.eq(labels).sum().item()
+                _, top5 = logits.topk(5, 1, True, True)
+                train_correct_5 += (
+                    top5.eq(labels.view(-1, 1).expand_as(top5)).sum().item()
+                )
+
             if i % cfg.train.log_interval == 0:
+                train_acc1 = 100.0 * train_correct_1 / train_total
                 logger.info(
-                    f"Epoch {epoch} | Step {i} | Loss: {loss.item():.4f} | LR: {lr:.2e}"
+                    f"Epoch {epoch} | Step {i} | Loss: {loss.item():.4f} | Acc1: {train_acc1:.2f}% | LR: {lr:.2e}"
                 )
                 wandb.log(
                     {
                         "train/loss": loss.item(),
+                        "train/acc1": train_acc1,
+                        "train/acc5": 100.0 * train_correct_5 / train_total,
                         "train/lr": lr,
                         "train/epoch": epoch + i / steps_per_epoch,
                     }
                 )
 
         # Evaluation
-        val_loss, val_acc = evaluate(
+        val_loss, val_acc1, val_acc5 = evaluate(
             model, val_loader, device, max_steps=cfg.train.max_steps
         )
         logger.info(
-            f"Epoch {epoch} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.2f}%"
+            f"Epoch {epoch} | Val Loss: {val_loss:.4f} | Val Acc1: {val_acc1:.2f}% | Val Acc5: {val_acc5:.2f}%"
         )
-        wandb.log({"val/loss": val_loss, "val/acc": val_acc, "epoch": epoch})
 
-        if val_acc > best_acc:
-            best_acc = val_acc
+        if val_acc1 > best_acc:
+            best_acc = val_acc1
+            if wandb.run is not None:
+                wandb.run.summary["best_val_acc1"] = best_acc
             ckpt_path = os.path.join(cfg.paths.output_dir, "checkpoint-best-clf.pth")
             torch.save(
                 {
                     "epoch": epoch,
                     "model_state_dict": model.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict(),
-                    "val_acc": val_acc,
+                    "val_acc": val_acc1,
                 },
                 ckpt_path,
             )
+
+        wandb.log(
+            {
+                "val/loss": val_loss,
+                "val/acc1": val_acc1,
+                "val/acc5": val_acc5,
+                "epoch": epoch,
+            }
+        )
 
     wandb.finish()
 
