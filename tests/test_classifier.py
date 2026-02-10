@@ -56,6 +56,32 @@ def test_classifier_frozen_encoder():
     assert not torch.all(model.head.weight.grad == 0)
 
 
+def test_classifier_finetune_gradients():
+    """Verify that encoder gradients ARE tracked during fine-tuning forward pass."""
+    encoder = mae_vit_lite_patch4()
+    model = ViTClassifier(encoder, num_classes=10, embed_dim=256, finetune=True)
+
+    imgs = torch.randn(2, 3, 64, 64)
+    imgs.requires_grad = True
+
+    logits = model(imgs)
+    loss = logits.sum()
+    loss.backward()
+
+    # In fine-tuning mode, encoder parameters SHOULD have gradients
+    encoder_has_grads = False
+    for _name, param in model.encoder.named_parameters():
+        if param.grad is not None and not torch.all(param.grad == 0):
+            encoder_has_grads = True
+            break
+
+    assert encoder_has_grads, "Encoder should have gradients in fine-tuning mode"
+
+    # Head should also have gradients
+    assert model.head.weight.grad is not None
+    assert not torch.all(model.head.weight.grad == 0)
+
+
 def test_classifier_norm():
     """Verify that BatchNorm1d is present in the classifier."""
     encoder = mae_vit_lite_patch4()

@@ -76,3 +76,14 @@ remote-srun *args: sync
 # Tail the latest SLURM log on the cluster
 logs:
     ssh {{cluster_host}} "ls -t {{cluster_path}}/slurm_logs/*.out | head -n 1 | xargs tail -f"
+
+# --- Experiment Management ---
+
+# Default directory for pre-trained checkpoints on the cluster
+ckpt_dir := "/home/tau/lburgund/projects/m2-ovo-mae/outputs/2026-02-06/19-41-41"
+
+# Launch both linprobe and finetune sweeps across all checkpoints in a directory
+launch-all-evals dir=ckpt_dir:
+    @echo "Launching evaluation sweep for all checkpoints in {{dir}}..."
+    just remote slurm experiment=linprobe_tin,finetune_tin \
+      pretrained_checkpoint="{{dir}}/checkpoint-99.pth,{{dir}}/checkpoint-199.pth,{{dir}}/checkpoint-299.pth,{{dir}}/checkpoint-399.pth,{{dir}}/checkpoint-499.pth,{{dir}}/checkpoint-599.pth,{{dir}}/checkpoint-699.pth,{{dir}}/checkpoint-799.pth,{{dir}}/checkpoint-899.pth,{{dir}}/checkpoint-999.pth,{{dir}}/checkpoint-1099.pth,{{dir}}/checkpoint-1199.pth"

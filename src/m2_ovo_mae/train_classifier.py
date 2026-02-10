@@ -65,11 +65,12 @@ def main(cfg: DictConfig):
     # WandB initialization
     if wandb.run is None:
         wandb_config = cast(dict[str, Any], OmegaConf.to_container(cfg, resolve=True))
+        mode_name = "finetune" if cfg.train.get("finetune", False) else "linprobe"
         wandb.init(
             project=cfg.wandb.project,
             mode=cfg.wandb.mode,
             config=wandb_config,
-            name=f"linprobe-{time.strftime('%Y%m%d-%H%M%S')}",
+            name=f"{mode_name}-{time.strftime('%Y%m%d-%H%M%S')}",
         )
 
     # Ensure output directory exists
@@ -90,10 +91,12 @@ def main(cfg: DictConfig):
         )
 
     # Create the Classifier wrapper
+    finetune = cfg.train.get("finetune", False)
     model = ViTClassifier(
         encoder=mae_model,
         num_classes=cfg.dataset.num_classes,
         embed_dim=cfg.model.embed_dim,
+        finetune=finetune,
     )
     model.to(device)
 
@@ -142,10 +145,18 @@ def main(cfg: DictConfig):
         ),
     )
 
-    # Optimizer (MAE paper uses LARS or SGD with specific settings for linprobe)
-    # We will use AdamW here
+    # Optimizer
+    if finetune:
+        # Optimize all parameters for fine-tuning
+        params = model.parameters()
+        logger.info("Fine-tuning: optimizing all parameters")
+    else:
+        # Only optimize the head for linear probing
+        params = model.head.parameters()
+        logger.info("Linear Probing: optimizing only the classification head")
+
     optimizer = torch.optim.AdamW(
-        model.head.parameters(),  # Only optimize the head for linear probing
+        params,
         lr=0,  # Will be set by adjust_learning_rate
         weight_decay=cfg.optimizer.weight_decay,
     )
@@ -158,8 +169,9 @@ def main(cfg: DictConfig):
 
     for epoch in range(total_epochs):
         model.train()
-        # Freeze encoder explicitly just in case
-        model.encoder.eval()
+        if not finetune:
+            # Freeze encoder explicitly for linear probing
+            model.encoder.eval()
 
         for i, (imgs, labels) in enumerate(train_loader):
             if cfg.train.max_steps is not None and i >= cfg.train.max_steps:

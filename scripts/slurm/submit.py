@@ -80,7 +80,10 @@ def submit_job(partition, time, gpus, cmd_args):
     """
     # Determine the entry point (pretrain or classifier)
     script_path = "src/m2_ovo_mae/train_pretrain.py"
-    if any("classifier" in arg or "linprobe" in arg for arg in cmd_args):
+    if any(
+        "classifier" in arg or "linprobe" in arg or "finetune" in arg
+        for arg in cmd_args
+    ):
         script_path = "src/m2_ovo_mae/train_classifier.py"
 
     python_cmd = f"uv run python {script_path} {' '.join(cmd_args)}"

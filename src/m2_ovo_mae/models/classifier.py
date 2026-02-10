@@ -5,16 +5,18 @@ import torch.nn as nn
 class ViTClassifier(nn.Module):
     """Linear classifier wrapper for a pre-trained ViT encoder."""
 
-    def __init__(self, encoder, num_classes=200, embed_dim=256):
+    def __init__(self, encoder, num_classes=200, embed_dim=256, finetune=False):
         """Initializes the ViTClassifier.
 
         Args:
             encoder (nn.Module): The pre-trained ViT encoder.
             num_classes (int): Number of classification classes.
             embed_dim (int): The embedding dimension of the encoder.
+            finetune (bool): Whether to fine-tune the encoder.
         """
         super().__init__()
         self.encoder = encoder
+        self.finetune = finetune
 
         self.norm = nn.BatchNorm1d(embed_dim, affine=False, eps=1e-6)
         self.head = nn.Linear(embed_dim, num_classes)
@@ -28,10 +30,12 @@ class ViTClassifier(nn.Module):
         Returns:
             torch.Tensor: Classification logits (N, num_classes).
         """
-        # Get frozen features from CLS token
-        # For linear probing, encoder is frozen.
-        with torch.no_grad():
+        # Get features from CLS token
+        if self.finetune:
             features = self.encoder.forward_features(x)
+        else:
+            with torch.no_grad():
+                features = self.encoder.forward_features(x)
 
         # Apply norm and linear head
         x = self.norm(features)
