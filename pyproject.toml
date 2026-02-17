@@ -72,5 +72,8 @@ ignore = [
   "PT018",
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"notebooks/*" = ["D"]
+
 [tool.ruff.lint.pydocstyle]
 convention = "google"
