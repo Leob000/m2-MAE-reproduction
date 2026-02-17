@@ -12,3 +12,4 @@ wheels/
 data/
 outputs/
 .env
+.ipynb_checkpoints/
