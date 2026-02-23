@@ -69,7 +69,7 @@ The following table summarizes the hyperparameters used for the different traini
 | Weight Decay | 0.15 | 0.0 | 0.05 |
 | Batch Size | 256 | 128 | 128 |
 | Epochs | 800 / 1200 | 50 | 100 |
-| Warmup Epochs | 20 / 40 | 2 | 5 |
+| Warmup Epochs | 20 | 2 | 5 |
 | Learning Rate Schedule| Cosine Decay | Cosine Decay | Cosine Decay |
 | Augmentation | Flip + RRC | Flip | RandAug (2, 9) |
 | Masking Ratio | 75% | - | - |
